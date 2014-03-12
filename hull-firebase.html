@@ -1,0 +1,92 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Firebase and Hull</title>
+</head>
+<body>
+  <div class="users-list"></div>
+ 
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script src="//cdn.firebase.com/js/client/1.0.2/firebase.js"></script>
+  <script src="//d3f5pyioow99x0.cloudfront.net/0.8.0/hull.api.js"></script>
+ 
+  <script>
+    var fireUsersList = new Firebase('https://YOUR_FIREBASE.firebaseIO.com/');
+    var fireUser = fireUsersList.push();
+ 
+    var fireConnected = new Firebase('https://YOUR_FIREBASE.firebaseIO.com/.info/connected');
+ 
+    Hull.init({
+      appId : 'YOUR_APP_ID',
+      orgUrl: 'YOUR_ORG_URL'
+    }, boostrap);
+ 
+    function boostrap() {
+      var user = Hull.currentUser();
+ 
+      var $button = $(document.createElement('button'));
+      $button.text(user ? 'Logout' : 'Login with Facebook');
+      $button.on('click', function(e) {
+        e.preventDefault();
+        if (user) {
+          Hull.logout();
+        } else {
+          Hull.login('facebook');
+        }
+      });
+      $('body').append($button);
+ 
+      Hull.on('hull.auth.*', function(u) {
+        user = u;
+ 
+        $button.text(user ? 'Logout' : 'Login with Facebook');
+        fireUser.set({ name: (user && user.name) || 'Guest', status: 'online' });
+      });
+ 
+      fireConnected.on('value', function(snap) {
+        if (snap.val()) {
+          fireUser.onDisconnect().remove();
+          fireUser.set({ name: (user && user.name) || 'Guest', status: 'online' });
+        }
+      });
+    }
+ 
+    var $usersList = $('.users-list');
+    var userNodes = {};
+ 
+    function setUser(name, status) {
+      fireUser.set({
+        name: name || 'Guest',
+        status: status
+      })
+    }
+ 
+    function getMessageId(snap) {
+      return snap.name().replace(/[^a-z0-9\-\_]/gi, '');
+    }
+ 
+    fireUsersList.on('child_added', function(snap) {
+      var user = snap.val();
+ 
+      var nodeId = getMessageId(snap);
+      var $user = $(document.createElement('div')).attr('id', nodeId);
+      $user.text(user.name + ' is ' + user.status);
+ 
+      userNodes[nodeId] = $user;
+      $usersList.append($user);
+    });
+ 
+    fireUsersList.on('child_removed', function(snap) {
+      userNodes[getMessageId(snap)].remove();
+    });
+ 
+    fireUsersList.on('child_changed', function(snap) {
+      var user = snap.val();
+ 
+      $user = userNodes[getMessageId(snap)]
+      $user.text(user.name + ' is ' + user.status);
+    });
+  </script>
+</body>
+</html>
